@@ -763,6 +763,7 @@ class BlockedReason(enum.Enum):
         "corp-not-same-origin-after-defaulted-to-same-origin-by-coep-and-dip"
     )
     CORP_NOT_SAME_SITE = "corp-not-same-site"
+    SRI_MESSAGE_SIGNATURE_MISMATCH = "sri-message-signature-mismatch"
 
     def to_json(self) -> str:
         return self.value
@@ -817,6 +818,7 @@ class CorsError(enum.Enum):
         "PrivateNetworkAccessPermissionUnavailable"
     )
     PRIVATE_NETWORK_ACCESS_PERMISSION_DENIED = "PrivateNetworkAccessPermissionDenied"
+    LOCAL_NETWORK_ACCESS_PERMISSION_DENIED = "LocalNetworkAccessPermissionDenied"
 
     def to_json(self) -> str:
         return self.value
@@ -1702,6 +1704,7 @@ class CookieExemptionReason(enum.Enum):
     STORAGE_ACCESS = "StorageAccess"
     TOP_LEVEL_STORAGE_ACCESS = "TopLevelStorageAccess"
     SCHEME = "Scheme"
+    SAME_SITE_NONE_COOKIES_IN_SANDBOX = "SameSiteNoneCookiesInSandbox"
 
     def to_json(self) -> str:
         return self.value
@@ -2358,12 +2361,82 @@ class ContentEncoding(enum.Enum):
         return cls(json)
 
 
+class DirectSocketDnsQueryType(enum.Enum):
+    IPV4 = "ipv4"
+    IPV6 = "ipv6"
+
+    def to_json(self) -> str:
+        return self.value
+
+    @classmethod
+    def from_json(cls, json: str) -> DirectSocketDnsQueryType:
+        return cls(json)
+
+
+@dataclass
+class DirectTCPSocketOptions:
+    #: TCP_NODELAY option
+    no_delay: bool
+
+    #: Expected to be unsigned integer.
+    keep_alive_delay: typing.Optional[float] = None
+
+    #: Expected to be unsigned integer.
+    send_buffer_size: typing.Optional[float] = None
+
+    #: Expected to be unsigned integer.
+    receive_buffer_size: typing.Optional[float] = None
+
+    dns_query_type: typing.Optional[DirectSocketDnsQueryType] = None
+
+    def to_json(self) -> T_JSON_DICT:
+        json: T_JSON_DICT = dict()
+        json["noDelay"] = self.no_delay
+        if self.keep_alive_delay is not None:
+            json["keepAliveDelay"] = self.keep_alive_delay
+        if self.send_buffer_size is not None:
+            json["sendBufferSize"] = self.send_buffer_size
+        if self.receive_buffer_size is not None:
+            json["receiveBufferSize"] = self.receive_buffer_size
+        if self.dns_query_type is not None:
+            json["dnsQueryType"] = self.dns_query_type.to_json()
+        return json
+
+    @classmethod
+    def from_json(cls, json: T_JSON_DICT) -> DirectTCPSocketOptions:
+        return cls(
+            no_delay=bool(json["noDelay"]),
+            keep_alive_delay=(
+                float(json["keepAliveDelay"])
+                if json.get("keepAliveDelay", None) is not None
+                else None
+            ),
+            send_buffer_size=(
+                float(json["sendBufferSize"])
+                if json.get("sendBufferSize", None) is not None
+                else None
+            ),
+            receive_buffer_size=(
+                float(json["receiveBufferSize"])
+                if json.get("receiveBufferSize", None) is not None
+                else None
+            ),
+            dns_query_type=(
+                DirectSocketDnsQueryType.from_json(json["dnsQueryType"])
+                if json.get("dnsQueryType", None) is not None
+                else None
+            ),
+        )
+
+
 class PrivateNetworkRequestPolicy(enum.Enum):
     ALLOW = "Allow"
     BLOCK_FROM_INSECURE_TO_MORE_PRIVATE = "BlockFromInsecureToMorePrivate"
     WARN_FROM_INSECURE_TO_MORE_PRIVATE = "WarnFromInsecureToMorePrivate"
     PREFLIGHT_BLOCK = "PreflightBlock"
     PREFLIGHT_WARN = "PreflightWarn"
+    PERMISSION_BLOCK = "PermissionBlock"
+    PERMISSION_WARN = "PermissionWarn"
 
     def to_json(self) -> str:
         return self.value
@@ -2825,7 +2898,7 @@ class LoadNetworkResourceOptions:
 
 
 def set_accepted_encodings(
-    encodings: typing.List[ContentEncoding],
+        encodings: typing.List[ContentEncoding],
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Sets a list of content encodings that will be accepted. Empty list means no encoding is accepted.
@@ -2844,7 +2917,7 @@ def set_accepted_encodings(
 
 
 def clear_accepted_encodings_override() -> (
-    typing.Generator[T_JSON_DICT, T_JSON_DICT, None]
+        typing.Generator[T_JSON_DICT, T_JSON_DICT, None]
 ):
     """
     Clears accepted encodings set by setAcceptedEncodings
@@ -2891,7 +2964,7 @@ def can_clear_browser_cookies() -> typing.Generator[T_JSON_DICT, T_JSON_DICT, bo
 
 @deprecated(version="1.3")
 def can_emulate_network_conditions() -> (
-    typing.Generator[T_JSON_DICT, T_JSON_DICT, bool]
+        typing.Generator[T_JSON_DICT, T_JSON_DICT, bool]
 ):
     """
     Tells whether emulation of network conditions is supported.
@@ -2929,14 +3002,14 @@ def clear_browser_cookies() -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
 
 @deprecated(version="1.3")
 def continue_intercepted_request(
-    interception_id: InterceptionId,
-    error_reason: typing.Optional[ErrorReason] = None,
-    raw_response: typing.Optional[str] = None,
-    url: typing.Optional[str] = None,
-    method: typing.Optional[str] = None,
-    post_data: typing.Optional[str] = None,
-    headers: typing.Optional[Headers] = None,
-    auth_challenge_response: typing.Optional[AuthChallengeResponse] = None,
+        interception_id: InterceptionId,
+        error_reason: typing.Optional[ErrorReason] = None,
+        raw_response: typing.Optional[str] = None,
+        url: typing.Optional[str] = None,
+        method: typing.Optional[str] = None,
+        post_data: typing.Optional[str] = None,
+        headers: typing.Optional[Headers] = None,
+        auth_challenge_response: typing.Optional[AuthChallengeResponse] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Response to Network.requestIntercepted which either modifies the request to continue with any
@@ -2982,11 +3055,11 @@ def continue_intercepted_request(
 
 
 def delete_cookies(
-    name: str,
-    url: typing.Optional[str] = None,
-    domain: typing.Optional[str] = None,
-    path: typing.Optional[str] = None,
-    partition_key: typing.Optional[CookiePartitionKey] = None,
+        name: str,
+        url: typing.Optional[str] = None,
+        domain: typing.Optional[str] = None,
+        path: typing.Optional[str] = None,
+        partition_key: typing.Optional[CookiePartitionKey] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Deletes browser cookies with matching name and url or domain/path/partitionKey pair.
@@ -3025,14 +3098,14 @@ def disable() -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
 
 
 def emulate_network_conditions(
-    offline: bool,
-    latency: float,
-    download_throughput: float,
-    upload_throughput: float,
-    connection_type: typing.Optional[ConnectionType] = None,
-    packet_loss: typing.Optional[float] = None,
-    packet_queue_length: typing.Optional[int] = None,
-    packet_reordering: typing.Optional[bool] = None,
+        offline: bool,
+        latency: float,
+        download_throughput: float,
+        upload_throughput: float,
+        connection_type: typing.Optional[ConnectionType] = None,
+        packet_loss: typing.Optional[float] = None,
+        packet_queue_length: typing.Optional[int] = None,
+        packet_reordering: typing.Optional[bool] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Activates emulation of network conditions.
@@ -3067,9 +3140,9 @@ def emulate_network_conditions(
 
 
 def enable(
-    max_total_buffer_size: typing.Optional[int] = None,
-    max_resource_buffer_size: typing.Optional[int] = None,
-    max_post_data_size: typing.Optional[int] = None,
+        max_total_buffer_size: typing.Optional[int] = None,
+        max_resource_buffer_size: typing.Optional[int] = None,
+        max_post_data_size: typing.Optional[int] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Enables network tracking, network events will now be delivered to the client.
@@ -3094,7 +3167,7 @@ def enable(
 
 @deprecated(version="1.3")
 def get_all_cookies() -> (
-    typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.List[Cookie]]
+        typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.List[Cookie]]
 ):
     """
     Returns all browser cookies. Depending on the backend support, will return detailed cookie
@@ -3113,7 +3186,7 @@ def get_all_cookies() -> (
 
 
 def get_certificate(
-    origin: str,
+        origin: str,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.List[str]]:
     """
     Returns the DER-encoded certificate.
@@ -3134,7 +3207,7 @@ def get_certificate(
 
 
 def get_cookies(
-    urls: typing.Optional[typing.List[str]] = None,
+        urls: typing.Optional[typing.List[str]] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.List[Cookie]]:
     """
     Returns all browser cookies for the current URL. Depending on the backend support, will return
@@ -3155,7 +3228,7 @@ def get_cookies(
 
 
 def get_response_body(
-    request_id: RequestId,
+        request_id: RequestId,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.Tuple[str, bool]]:
     """
     Returns content served for the given request.
@@ -3177,7 +3250,7 @@ def get_response_body(
 
 
 def get_request_post_data(
-    request_id: RequestId,
+        request_id: RequestId,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, str]:
     """
     Returns post data sent with the request. Returns an error when no data was sent with the request.
@@ -3196,7 +3269,7 @@ def get_request_post_data(
 
 
 def get_response_body_for_interception(
-    interception_id: InterceptionId,
+        interception_id: InterceptionId,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.Tuple[str, bool]]:
     """
     Returns content served for the given currently intercepted request.
@@ -3220,7 +3293,7 @@ def get_response_body_for_interception(
 
 
 def take_response_body_for_interception_as_stream(
-    interception_id: InterceptionId,
+        interception_id: InterceptionId,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, io.StreamHandle]:
     """
     Returns a handle to the stream representing the response body. Note that after this command,
@@ -3244,7 +3317,7 @@ def take_response_body_for_interception_as_stream(
 
 
 def replay_xhr(
-    request_id: RequestId,
+        request_id: RequestId,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     This method sends a new XMLHttpRequest which is identical to the original one. The following
@@ -3265,10 +3338,10 @@ def replay_xhr(
 
 
 def search_in_response_body(
-    request_id: RequestId,
-    query: str,
-    case_sensitive: typing.Optional[bool] = None,
-    is_regex: typing.Optional[bool] = None,
+        request_id: RequestId,
+        query: str,
+        case_sensitive: typing.Optional[bool] = None,
+        is_regex: typing.Optional[bool] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.List[debugger.SearchMatch]]:
     """
     Searches for given string in response content.
@@ -3297,7 +3370,7 @@ def search_in_response_body(
 
 
 def set_blocked_ur_ls(
-    urls: typing.List[str],
+        urls: typing.List[str],
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Blocks URLs from loading.
@@ -3316,7 +3389,7 @@ def set_blocked_ur_ls(
 
 
 def set_bypass_service_worker(
-    bypass: bool,
+        bypass: bool,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Toggles ignoring of service worker for each request.
@@ -3333,7 +3406,7 @@ def set_bypass_service_worker(
 
 
 def set_cache_disabled(
-    cache_disabled: bool,
+        cache_disabled: bool,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Toggles ignoring cache for each request. If ``true``, cache will not be used.
@@ -3350,20 +3423,20 @@ def set_cache_disabled(
 
 
 def set_cookie(
-    name: str,
-    value: str,
-    url: typing.Optional[str] = None,
-    domain: typing.Optional[str] = None,
-    path: typing.Optional[str] = None,
-    secure: typing.Optional[bool] = None,
-    http_only: typing.Optional[bool] = None,
-    same_site: typing.Optional[CookieSameSite] = None,
-    expires: typing.Optional[TimeSinceEpoch] = None,
-    priority: typing.Optional[CookiePriority] = None,
-    same_party: typing.Optional[bool] = None,
-    source_scheme: typing.Optional[CookieSourceScheme] = None,
-    source_port: typing.Optional[int] = None,
-    partition_key: typing.Optional[CookiePartitionKey] = None,
+        name: str,
+        value: str,
+        url: typing.Optional[str] = None,
+        domain: typing.Optional[str] = None,
+        path: typing.Optional[str] = None,
+        secure: typing.Optional[bool] = None,
+        http_only: typing.Optional[bool] = None,
+        same_site: typing.Optional[CookieSameSite] = None,
+        expires: typing.Optional[TimeSinceEpoch] = None,
+        priority: typing.Optional[CookiePriority] = None,
+        same_party: typing.Optional[bool] = None,
+        source_scheme: typing.Optional[CookieSourceScheme] = None,
+        source_port: typing.Optional[int] = None,
+        partition_key: typing.Optional[CookiePartitionKey] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, bool]:
     """
     Sets a cookie with the given cookie data; may overwrite equivalent cookies if they exist.
@@ -3420,7 +3493,7 @@ def set_cookie(
 
 
 def set_cookies(
-    cookies: typing.List[CookieParam],
+        cookies: typing.List[CookieParam],
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Sets given cookies.
@@ -3437,7 +3510,7 @@ def set_cookies(
 
 
 def set_extra_http_headers(
-    headers: Headers,
+        headers: Headers,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Specifies whether to always send extra HTTP headers with the requests from this page.
@@ -3454,7 +3527,7 @@ def set_extra_http_headers(
 
 
 def set_attach_debug_stack(
-    enabled: bool,
+        enabled: bool,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Specifies whether to attach a page script stack id in requests
@@ -3474,7 +3547,7 @@ def set_attach_debug_stack(
 
 @deprecated(version="1.3")
 def set_request_interception(
-    patterns: typing.List[RequestPattern],
+        patterns: typing.List[RequestPattern],
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Sets the requests to intercept that match the provided patterns and optionally resource types.
@@ -3496,10 +3569,10 @@ def set_request_interception(
 
 
 def set_user_agent_override(
-    user_agent: str,
-    accept_language: typing.Optional[str] = None,
-    platform: typing.Optional[str] = None,
-    user_agent_metadata: typing.Optional[emulation.UserAgentMetadata] = None,
+        user_agent: str,
+        accept_language: typing.Optional[str] = None,
+        platform: typing.Optional[str] = None,
+        user_agent_metadata: typing.Optional[emulation.UserAgentMetadata] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Allows overriding user agent with the given string.
@@ -3525,7 +3598,7 @@ def set_user_agent_override(
 
 
 def stream_resource_content(
-    request_id: RequestId,
+        request_id: RequestId,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, str]:
     """
     Enables streaming of the response for the given requestId.
@@ -3547,7 +3620,7 @@ def stream_resource_content(
 
 
 def get_security_isolation_status(
-    frame_id: typing.Optional[page.FrameId] = None,
+        frame_id: typing.Optional[page.FrameId] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, SecurityIsolationStatus]:
     """
     Returns information about the COEP/COOP isolation status.
@@ -3569,7 +3642,7 @@ def get_security_isolation_status(
 
 
 def enable_reporting_api(
-    enable: bool,
+        enable: bool,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Enables tracking for the Reporting API, events generated by the Reporting API will now be delivered to the client.
@@ -3589,9 +3662,9 @@ def enable_reporting_api(
 
 
 def load_network_resource(
-    url: str,
-    options: LoadNetworkResourceOptions,
-    frame_id: typing.Optional[page.FrameId] = None,
+        url: str,
+        options: LoadNetworkResourceOptions,
+        frame_id: typing.Optional[page.FrameId] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, LoadNetworkResourcePageResult]:
     """
     Fetches the resource and returns the content.
@@ -3614,6 +3687,32 @@ def load_network_resource(
     }
     json = yield cmd_dict
     return LoadNetworkResourcePageResult.from_json(json["resource"])
+
+
+def set_cookie_controls(
+        enable_third_party_cookie_restriction: bool,
+        disable_third_party_cookie_metadata: bool,
+        disable_third_party_cookie_heuristics: bool,
+) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
+    """
+    Sets Controls for third-party cookie access
+    Page reload is required before the new cookie bahavior will be observed
+
+    **EXPERIMENTAL**
+
+    :param enable_third_party_cookie_restriction: Whether 3pc restriction is enabled.
+    :param disable_third_party_cookie_metadata: Whether 3pc grace period exception should be enabled; false by default.
+    :param disable_third_party_cookie_heuristics: Whether 3pc heuristics exceptions should be enabled; false by default.
+    """
+    params: T_JSON_DICT = dict()
+    params["enableThirdPartyCookieRestriction"] = enable_third_party_cookie_restriction
+    params["disableThirdPartyCookieMetadata"] = disable_third_party_cookie_metadata
+    params["disableThirdPartyCookieHeuristics"] = disable_third_party_cookie_heuristics
+    cmd_dict: T_JSON_DICT = {
+        "method": "Network.setCookieControls",
+        "params": params,
+    }
+    json = yield cmd_dict
 
 
 @event_class("Network.dataReceived")
@@ -4239,6 +4338,119 @@ class WebTransportClosed:
         )
 
 
+@event_class("Network.directTCPSocketCreated")
+@dataclass
+class DirectTCPSocketCreated:
+    """
+    **EXPERIMENTAL**
+
+    Fired upon direct_socket.TCPSocket creation.
+    """
+
+    identifier: RequestId
+    remote_addr: str
+    #: Unsigned int 16.
+    remote_port: int
+    options: DirectTCPSocketOptions
+    timestamp: MonotonicTime
+    initiator: typing.Optional[Initiator]
+
+    @classmethod
+    def from_json(cls, json: T_JSON_DICT) -> DirectTCPSocketCreated:
+        return cls(
+            identifier=RequestId.from_json(json["identifier"]),
+            remote_addr=str(json["remoteAddr"]),
+            remote_port=int(json["remotePort"]),
+            options=DirectTCPSocketOptions.from_json(json["options"]),
+            timestamp=MonotonicTime.from_json(json["timestamp"]),
+            initiator=(
+                Initiator.from_json(json["initiator"])
+                if json.get("initiator", None) is not None
+                else None
+            ),
+        )
+
+
+@event_class("Network.directTCPSocketOpened")
+@dataclass
+class DirectTCPSocketOpened:
+    """
+    **EXPERIMENTAL**
+
+    Fired when direct_socket.TCPSocket connection is opened.
+    """
+
+    identifier: RequestId
+    remote_addr: str
+    #: Expected to be unsigned integer.
+    remote_port: int
+    timestamp: MonotonicTime
+    local_addr: typing.Optional[str]
+    #: Expected to be unsigned integer.
+    local_port: typing.Optional[int]
+
+    @classmethod
+    def from_json(cls, json: T_JSON_DICT) -> DirectTCPSocketOpened:
+        return cls(
+            identifier=RequestId.from_json(json["identifier"]),
+            remote_addr=str(json["remoteAddr"]),
+            remote_port=int(json["remotePort"]),
+            timestamp=MonotonicTime.from_json(json["timestamp"]),
+            local_addr=(
+                str(json["localAddr"])
+                if json.get("localAddr", None) is not None
+                else None
+            ),
+            local_port=(
+                int(json["localPort"])
+                if json.get("localPort", None) is not None
+                else None
+            ),
+        )
+
+
+@event_class("Network.directTCPSocketAborted")
+@dataclass
+class DirectTCPSocketAborted:
+    """
+    **EXPERIMENTAL**
+
+    Fired when direct_socket.TCPSocket is aborted.
+    """
+
+    identifier: RequestId
+    error_message: str
+    timestamp: MonotonicTime
+
+    @classmethod
+    def from_json(cls, json: T_JSON_DICT) -> DirectTCPSocketAborted:
+        return cls(
+            identifier=RequestId.from_json(json["identifier"]),
+            error_message=str(json["errorMessage"]),
+            timestamp=MonotonicTime.from_json(json["timestamp"]),
+        )
+
+
+@event_class("Network.directTCPSocketClosed")
+@dataclass
+class DirectTCPSocketClosed:
+    """
+    **EXPERIMENTAL**
+
+    Fired when direct_socket.TCPSocket is closed.
+    """
+
+    identifier: RequestId
+    timestamp: MonotonicTime
+
+    @classmethod
+    def from_json(cls, json: T_JSON_DICT) -> DirectTCPSocketClosed:
+        return cls(
+            identifier=RequestId.from_json(json["identifier"]),
+            timestamp=MonotonicTime.from_json(json["timestamp"]),
+        )
+
+
 @event_class("Network.requestWillBeSentExtraInfo")
 @dataclass
 class RequestWillBeSentExtraInfo:
@@ -4305,6 +4517,9 @@ class ResponseReceivedExtraInfo:
     #: are represented by the invalid cookie line string instead of a proper cookie.
     blocked_cookies: typing.List[BlockedSetCookieWithReason]
     #: Raw response headers as they were received over the wire.
+    #: Duplicate headers in the response are represented as a single key with their values
+    #: concatentated using ``\n`` as the separator.
+    #: See also ``headersText`` that contains verbatim text for HTTP/1.*.
     headers: Headers
     #: The IP address space of the resource. The address space can only be determined once the transport
     #: established the connection, so we can't send it in ``requestWillBeSentExtraInfo``.
@@ -4377,6 +4592,9 @@ class ResponseReceivedEarlyHints:
     #: Request identifier. Used to match this information to another responseReceived event.
     request_id: RequestId
     #: Raw response headers as they were received over the wire.
+    #: Duplicate headers in the response are represented as a single key with their values
+    #: concatentated using ``\n`` as the separator.
+    #: See also ``headersText`` that contains verbatim text for HTTP/1.*.
     headers: Headers
 
     @classmethod

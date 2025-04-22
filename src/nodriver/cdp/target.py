@@ -193,8 +193,26 @@ class RemoteLocation:
         )
 
 
+class WindowState(enum.Enum):
+    """
+    The state of the target window.
+    """
+
+    NORMAL = "normal"
+    MINIMIZED = "minimized"
+    MAXIMIZED = "maximized"
+    FULLSCREEN = "fullscreen"
+
+    def to_json(self) -> str:
+        return self.value
+
+    @classmethod
+    def from_json(cls, json: str) -> WindowState:
+        return cls(json)
+
+
 def activate_target(
-    target_id: TargetID,
+        target_id: TargetID,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Activates (focuses) the target.
@@ -211,7 +229,7 @@ def activate_target(
 
 
 def attach_to_target(
-    target_id: TargetID, flatten: typing.Optional[bool] = None
+        target_id: TargetID, flatten: typing.Optional[bool] = None
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, SessionID]:
     """
     Attaches to the target with given id.
@@ -248,7 +266,7 @@ def attach_to_browser_target() -> typing.Generator[T_JSON_DICT, T_JSON_DICT, Ses
 
 
 def close_target(
-    target_id: TargetID,
+        target_id: TargetID,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, bool]:
     """
     Closes the target. If the target is a page that gets closed too.
@@ -267,7 +285,9 @@ def close_target(
 
 
 def expose_dev_tools_protocol(
-    target_id: TargetID, binding_name: typing.Optional[str] = None
+        target_id: TargetID,
+        binding_name: typing.Optional[str] = None,
+        inherit_permissions: typing.Optional[bool] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Inject object to the target's main frame that provides a communication
@@ -283,11 +303,14 @@ def expose_dev_tools_protocol(
 
     :param target_id:
     :param binding_name: *(Optional)* Binding name, 'cdp' if not specified.
+    :param inherit_permissions: *(Optional)* If true, inherits the current root session's permissions (default: false).
     """
     params: T_JSON_DICT = dict()
     params["targetId"] = target_id.to_json()
     if binding_name is not None:
         params["bindingName"] = binding_name
+    if inherit_permissions is not None:
+        params["inheritPermissions"] = inherit_permissions
     cmd_dict: T_JSON_DICT = {
         "method": "Target.exposeDevToolsProtocol",
         "params": params,
@@ -296,10 +319,10 @@ def expose_dev_tools_protocol(
 
 
 def create_browser_context(
-    dispose_on_detach: typing.Optional[bool] = None,
-    proxy_server: typing.Optional[str] = None,
-    proxy_bypass_list: typing.Optional[str] = None,
-    origins_with_universal_network_access: typing.Optional[typing.List[str]] = None,
+        dispose_on_detach: typing.Optional[bool] = None,
+        proxy_server: typing.Optional[str] = None,
+        proxy_bypass_list: typing.Optional[str] = None,
+        origins_with_universal_network_access: typing.Optional[typing.List[str]] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, browser.BrowserContextID]:
     """
     Creates a new empty BrowserContext. Similar to an incognito profile but you can have more than
@@ -331,7 +354,7 @@ def create_browser_context(
 
 
 def get_browser_contexts() -> (
-    typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.List[browser.BrowserContextID]]
+        typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.List[browser.BrowserContextID]]
 ):
     """
     Returns all browser contexts created with ``Target.createBrowserContext`` method.
@@ -346,34 +369,46 @@ def get_browser_contexts() -> (
 
 
 def create_target(
-    url: str,
-    width: typing.Optional[int] = None,
-    height: typing.Optional[int] = None,
-    browser_context_id: typing.Optional[browser.BrowserContextID] = None,
-    enable_begin_frame_control: typing.Optional[bool] = None,
-    new_window: typing.Optional[bool] = None,
-    background: typing.Optional[bool] = None,
-    for_tab: typing.Optional[bool] = None,
+        url: str,
+        left: typing.Optional[int] = None,
+        top: typing.Optional[int] = None,
+        width: typing.Optional[int] = None,
+        height: typing.Optional[int] = None,
+        window_state: typing.Optional[WindowState] = None,
+        browser_context_id: typing.Optional[browser.BrowserContextID] = None,
+        enable_begin_frame_control: typing.Optional[bool] = None,
+        new_window: typing.Optional[bool] = None,
+        background: typing.Optional[bool] = None,
+        for_tab: typing.Optional[bool] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, TargetID]:
     """
     Creates a new page.
 
     :param url: The initial URL the page will be navigated to. An empty string indicates about:blank.
-    :param width: *(Optional)* Frame width in DIP (headless chrome only).
-    :param height: *(Optional)* Frame height in DIP (headless chrome only).
+    :param left: **(EXPERIMENTAL)** *(Optional)* Frame left origin in DIP (requires newWindow to be true or headless shell).
+    :param top: **(EXPERIMENTAL)** *(Optional)* Frame top origin in DIP (requires newWindow to be true or headless shell).
+    :param width: *(Optional)* Frame width in DIP (requires newWindow to be true or headless shell).
+    :param height: *(Optional)* Frame height in DIP (requires newWindow to be true or headless shell).
+    :param window_state: *(Optional)* Frame window state (requires newWindow to be true or headless shell). Default is normal.
     :param browser_context_id: **(EXPERIMENTAL)** *(Optional)* The browser context to create the page in.
-    :param enable_begin_frame_control: **(EXPERIMENTAL)** *(Optional)* Whether BeginFrames for this target will be controlled via DevTools (headless chrome only, not supported on MacOS yet, false by default).
-    :param new_window: *(Optional)* Whether to create a new Window or Tab (chrome-only, false by default).
-    :param background: *(Optional)* Whether to create the target in background or foreground (chrome-only, false by default).
+    :param enable_begin_frame_control: **(EXPERIMENTAL)** *(Optional)* Whether BeginFrames for this target will be controlled via DevTools (headless shell only, not supported on MacOS yet, false by default).
+    :param new_window: *(Optional)* Whether to create a new Window or Tab (false by default, not supported by headless shell).
+    :param background: *(Optional)* Whether to create the target in background or foreground (false by default, not supported by headless shell).
     :param for_tab: **(EXPERIMENTAL)** *(Optional)* Whether to create the target of type "tab".
     :returns: The id of the page opened.
     """
     params: T_JSON_DICT = dict()
     params["url"] = url
+    if left is not None:
+        params["left"] = left
+    if top is not None:
+        params["top"] = top
     if width is not None:
         params["width"] = width
     if height is not None:
         params["height"] = height
+    if window_state is not None:
+        params["windowState"] = window_state.to_json()
     if browser_context_id is not None:
         params["browserContextId"] = browser_context_id.to_json()
     if enable_begin_frame_control is not None:
@@ -393,8 +428,8 @@ def create_target(
 
 
 def detach_from_target(
-    session_id: typing.Optional[SessionID] = None,
-    target_id: typing.Optional[TargetID] = None,
+        session_id: typing.Optional[SessionID] = None,
+        target_id: typing.Optional[TargetID] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Detaches session with given id.
@@ -415,7 +450,7 @@ def detach_from_target(
 
 
 def dispose_browser_context(
-    browser_context_id: browser.BrowserContextID,
+        browser_context_id: browser.BrowserContextID,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Deletes a BrowserContext. All the belonging pages will be closed without calling their
@@ -433,7 +468,7 @@ def dispose_browser_context(
 
 
 def get_target_info(
-    target_id: typing.Optional[TargetID] = None,
+        target_id: typing.Optional[TargetID] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, TargetInfo]:
     """
     Returns information about a target.
@@ -455,7 +490,7 @@ def get_target_info(
 
 
 def get_targets(
-    filter_: typing.Optional[TargetFilter] = None,
+        filter_: typing.Optional[TargetFilter] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.List[TargetInfo]]:
     """
     Retrieves a list of available targets.
@@ -476,9 +511,9 @@ def get_targets(
 
 @deprecated(version="1.3")
 def send_message_to_target(
-    message: str,
-    session_id: typing.Optional[SessionID] = None,
-    target_id: typing.Optional[TargetID] = None,
+        message: str,
+        session_id: typing.Optional[SessionID] = None,
+        target_id: typing.Optional[TargetID] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Sends protocol message over session with given id.
@@ -505,10 +540,10 @@ def send_message_to_target(
 
 
 def set_auto_attach(
-    auto_attach: bool,
-    wait_for_debugger_on_start: bool,
-    flatten: typing.Optional[bool] = None,
-    filter_: typing.Optional[TargetFilter] = None,
+        auto_attach: bool,
+        wait_for_debugger_on_start: bool,
+        flatten: typing.Optional[bool] = None,
+        filter_: typing.Optional[TargetFilter] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Controls whether to automatically attach to new targets which are considered to be related to
@@ -537,9 +572,9 @@ def set_auto_attach(
 
 
 def auto_attach_related(
-    target_id: TargetID,
-    wait_for_debugger_on_start: bool,
-    filter_: typing.Optional[TargetFilter] = None,
+        target_id: TargetID,
+        wait_for_debugger_on_start: bool,
+        filter_: typing.Optional[TargetFilter] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Adds the specified target to the list of targets that will be monitored for any related target
@@ -567,7 +602,7 @@ def auto_attach_related(
 
 
 def set_discover_targets(
-    discover: bool, filter_: typing.Optional[TargetFilter] = None
+        discover: bool, filter_: typing.Optional[TargetFilter] = None
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Controls whether to discover available targets and notify via
@@ -588,7 +623,7 @@ def set_discover_targets(
 
 
 def set_remote_locations(
-    locations: typing.List[RemoteLocation],
+        locations: typing.List[RemoteLocation],
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Enables target discovery for the specified locations, when ``setDiscoverTargets`` was set to

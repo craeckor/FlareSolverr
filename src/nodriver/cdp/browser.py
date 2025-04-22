@@ -110,35 +110,42 @@ class Bounds:
 
 
 class PermissionType(enum.Enum):
-    ACCESSIBILITY_EVENTS = "accessibilityEvents"
+    AR = "ar"
     AUDIO_CAPTURE = "audioCapture"
-    BACKGROUND_SYNC = "backgroundSync"
+    AUTOMATIC_FULLSCREEN = "automaticFullscreen"
     BACKGROUND_FETCH = "backgroundFetch"
+    BACKGROUND_SYNC = "backgroundSync"
+    CAMERA_PAN_TILT_ZOOM = "cameraPanTiltZoom"
     CAPTURED_SURFACE_CONTROL = "capturedSurfaceControl"
     CLIPBOARD_READ_WRITE = "clipboardReadWrite"
     CLIPBOARD_SANITIZED_WRITE = "clipboardSanitizedWrite"
     DISPLAY_CAPTURE = "displayCapture"
     DURABLE_STORAGE = "durableStorage"
-    FLASH = "flash"
     GEOLOCATION = "geolocation"
+    HAND_TRACKING = "handTracking"
     IDLE_DETECTION = "idleDetection"
+    KEYBOARD_LOCK = "keyboardLock"
     LOCAL_FONTS = "localFonts"
+    LOCAL_NETWORK_ACCESS = "localNetworkAccess"
     MIDI = "midi"
     MIDI_SYSEX = "midiSysex"
     NFC = "nfc"
     NOTIFICATIONS = "notifications"
     PAYMENT_HANDLER = "paymentHandler"
     PERIODIC_BACKGROUND_SYNC = "periodicBackgroundSync"
+    POINTER_LOCK = "pointerLock"
     PROTECTED_MEDIA_IDENTIFIER = "protectedMediaIdentifier"
     SENSORS = "sensors"
-    STORAGE_ACCESS = "storageAccess"
+    SMART_CARD = "smartCard"
     SPEAKER_SELECTION = "speakerSelection"
+    STORAGE_ACCESS = "storageAccess"
     TOP_LEVEL_STORAGE_ACCESS = "topLevelStorageAccess"
     VIDEO_CAPTURE = "videoCapture"
-    VIDEO_CAPTURE_PAN_TILT_ZOOM = "videoCapturePanTiltZoom"
+    VR = "vr"
     WAKE_LOCK_SCREEN = "wakeLockScreen"
     WAKE_LOCK_SYSTEM = "wakeLockSystem"
     WEB_APP_INSTALLATION = "webAppInstallation"
+    WEB_PRINTING = "webPrinting"
     WINDOW_MANAGEMENT = "windowManagement"
 
     def to_json(self) -> str:
@@ -315,11 +322,23 @@ class Histogram:
         )
 
 
+class PrivacySandboxAPI(enum.Enum):
+    BIDDING_AND_AUCTION_SERVICES = "BiddingAndAuctionServices"
+    TRUSTED_KEY_VALUE = "TrustedKeyValue"
+
+    def to_json(self) -> str:
+        return self.value
+
+    @classmethod
+    def from_json(cls, json: str) -> PrivacySandboxAPI:
+        return cls(json)
+
+
 def set_permission(
-    permission: PermissionDescriptor,
-    setting: PermissionSetting,
-    origin: typing.Optional[str] = None,
-    browser_context_id: typing.Optional[BrowserContextID] = None,
+        permission: PermissionDescriptor,
+        setting: PermissionSetting,
+        origin: typing.Optional[str] = None,
+        browser_context_id: typing.Optional[BrowserContextID] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Set permission settings for given origin.
@@ -346,9 +365,9 @@ def set_permission(
 
 
 def grant_permissions(
-    permissions: typing.List[PermissionType],
-    origin: typing.Optional[str] = None,
-    browser_context_id: typing.Optional[BrowserContextID] = None,
+        permissions: typing.List[PermissionType],
+        origin: typing.Optional[str] = None,
+        browser_context_id: typing.Optional[BrowserContextID] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Grant specific permissions to the given origin and reject all others.
@@ -373,7 +392,7 @@ def grant_permissions(
 
 
 def reset_permissions(
-    browser_context_id: typing.Optional[BrowserContextID] = None,
+        browser_context_id: typing.Optional[BrowserContextID] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Reset all permission management for all origins.
@@ -391,10 +410,10 @@ def reset_permissions(
 
 
 def set_download_behavior(
-    behavior: str,
-    browser_context_id: typing.Optional[BrowserContextID] = None,
-    download_path: typing.Optional[str] = None,
-    events_enabled: typing.Optional[bool] = None,
+        behavior: str,
+        browser_context_id: typing.Optional[BrowserContextID] = None,
+        download_path: typing.Optional[str] = None,
+        events_enabled: typing.Optional[bool] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Set the behavior when downloading a file.
@@ -422,7 +441,7 @@ def set_download_behavior(
 
 
 def cancel_download(
-    guid: str, browser_context_id: typing.Optional[BrowserContextID] = None
+        guid: str, browser_context_id: typing.Optional[BrowserContextID] = None
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Cancel a download if in progress
@@ -478,7 +497,7 @@ def crash_gpu_process() -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
 
 
 def get_version() -> (
-    typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.Tuple[str, str, str, str, str]]
+        typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.Tuple[str, str, str, str, str]]
 ):
     """
     Returns version information.
@@ -505,7 +524,7 @@ def get_version() -> (
 
 
 def get_browser_command_line() -> (
-    typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.List[str]]
+        typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.List[str]]
 ):
     """
     Returns the command line switches for the browser process if, and only if
@@ -523,7 +542,7 @@ def get_browser_command_line() -> (
 
 
 def get_histograms(
-    query: typing.Optional[str] = None, delta: typing.Optional[bool] = None
+        query: typing.Optional[str] = None, delta: typing.Optional[bool] = None
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.List[Histogram]]:
     """
     Get Chrome histograms.
@@ -548,7 +567,7 @@ def get_histograms(
 
 
 def get_histogram(
-    name: str, delta: typing.Optional[bool] = None
+        name: str, delta: typing.Optional[bool] = None
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, Histogram]:
     """
     Get a Chrome histogram by name.
@@ -572,7 +591,7 @@ def get_histogram(
 
 
 def get_window_bounds(
-    window_id: WindowID,
+        window_id: WindowID,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, Bounds]:
     """
     Get position and size of the browser window.
@@ -593,7 +612,7 @@ def get_window_bounds(
 
 
 def get_window_for_target(
-    target_id: typing.Optional[target.TargetID] = None,
+        target_id: typing.Optional[target.TargetID] = None,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, typing.Tuple[WindowID, Bounds]]:
     """
     Get the browser window that contains the devtools target.
@@ -618,7 +637,7 @@ def get_window_for_target(
 
 
 def set_window_bounds(
-    window_id: WindowID, bounds: Bounds
+        window_id: WindowID, bounds: Bounds
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Set position and/or size of the browser window.
@@ -639,7 +658,7 @@ def set_window_bounds(
 
 
 def set_dock_tile(
-    badge_label: typing.Optional[str] = None, image: typing.Optional[str] = None
+        badge_label: typing.Optional[str] = None, image: typing.Optional[str] = None
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Set dock tile details, platform-specific.
@@ -662,7 +681,7 @@ def set_dock_tile(
 
 
 def execute_browser_command(
-    command_id: BrowserCommandId,
+        command_id: BrowserCommandId,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Invoke custom browser commands used by telemetry.
@@ -681,7 +700,7 @@ def execute_browser_command(
 
 
 def add_privacy_sandbox_enrollment_override(
-    url: str,
+        url: str,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Allows a site to use privacy sandbox features that require enrollment
@@ -693,6 +712,36 @@ def add_privacy_sandbox_enrollment_override(
     params["url"] = url
     cmd_dict: T_JSON_DICT = {
         "method": "Browser.addPrivacySandboxEnrollmentOverride",
+        "params": params,
+    }
+    json = yield cmd_dict
+
+
+def add_privacy_sandbox_coordinator_key_config(
+        api: PrivacySandboxAPI,
+        coordinator_origin: str,
+        key_config: str,
+        browser_context_id: typing.Optional[BrowserContextID] = None,
+) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
+    """
+    Configures encryption keys used with a given privacy sandbox API to talk
+    to a trusted coordinator.  Since this is intended for test automation only,
+    coordinatorOrigin must be a .test domain. No existing coordinator
+    configuration for the origin may exist.
+
+    :param api:
+    :param coordinator_origin:
+    :param key_config:
+    :param browser_context_id: *(Optional)* BrowserContext to perform the action in. When omitted, default browser context is used.
+    """
+    params: T_JSON_DICT = dict()
+    params["api"] = api.to_json()
+    params["coordinatorOrigin"] = coordinator_origin
+    params["keyConfig"] = key_config
+    if browser_context_id is not None:
+        params["browserContextId"] = browser_context_id.to_json()
+    cmd_dict: T_JSON_DICT = {
+        "method": "Browser.addPrivacySandboxCoordinatorKeyConfig",
         "params": params,
     }
     json = yield cmd_dict

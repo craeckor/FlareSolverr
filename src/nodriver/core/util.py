@@ -1,3 +1,10 @@
+# Copyright 2024 by UltrafunkAmsterdam (https://github.com/UltrafunkAmsterdam)
+# All rights reserved.
+# This file is part of the nodriver package.
+# and is released under the "GNU AFFERO GENERAL PUBLIC LICENSE".
+# Please see the LICENSE.txt file that should have been included as part of this package.
+
+
 from __future__ import annotations
 
 import asyncio
@@ -9,7 +16,6 @@ from typing import (
     Any,
     Callable,
     Generator,
-    Iterator,
     List,
     Optional,
     Set,
@@ -33,19 +39,18 @@ T = TypeVar("T")
 
 
 async def start(
-    config: Optional[Config] = None,
-    *,
-    user_data_dir: Optional[PathLike] = None,
-    headless: Optional[bool] = False,
-    browser_executable_path: Optional[PathLike] = None,
-    browser_args: Optional[List[str]] = None,
-    sandbox: Optional[bool] = True,
-    lang: Optional[str] = None,
-    windows_headless: Optional[bool] = False,
-    host: Optional[str] = None,
-    port: Optional[int] = None,
-    expert: Optional[bool] = None,
-    **kwargs: Optional[dict],
+        config: Optional[Config] = None,
+        *,
+        user_data_dir: Optional[PathLike] = None,
+        headless: Optional[bool] = False,
+        browser_executable_path: Optional[PathLike] = None,
+        browser_args: Optional[List[str]] = None,
+        sandbox: Optional[bool] = True,
+        lang: Optional[str] = None,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        expert: Optional[bool] = None,
+        **kwargs: Optional[dict],
 ) -> Browser:
     """
     helper function to launch a browser. it accepts several keyword parameters.
@@ -53,7 +58,6 @@ async def start(
     with best practice defaults.
     note: this should be called ```await start()```
 
-    windows_headless: Optional[bool] = False,
 
     :param user_data_dir:
     :type user_data_dir: PathLike
@@ -73,9 +77,6 @@ async def start(
 
     :param lang: language string
     :type lang: str
-
-    :param windows_headless:
-    :type windows_headless: bool
 
     :param port: if you connect to an existing debuggable session, you can specify the port here
                  if both host and port are provided, nodriver will not start a local chrome browser!
@@ -100,7 +101,6 @@ async def start(
             browser_args,
             sandbox,
             lang,
-            windows_headless,
             host=host,
             port=port,
             expert=expert,
@@ -112,7 +112,7 @@ async def start(
 
 
 async def create_from_undetected_chromedriver(
-    driver: "undetected_chromedriver.Chrome",
+        driver: "undetected_chromedriver.Chrome",
 ) -> Browser:
     """
     create a nodriver.Browser instance from a running undetected_chromedriver.Chrome instance.
@@ -163,6 +163,9 @@ def deconstruct_browser():
             try:
                 if _.config and not _.config.uses_custom_data_dir:
                     shutil.rmtree(_.config.user_data_dir, ignore_errors=False)
+                    print(
+                        "successfully removed temp profile %s" % _.config.user_data_dir
+                    )
             except FileNotFoundError as e:
                 break
             except (PermissionError, OSError) as e:
@@ -175,11 +178,10 @@ def deconstruct_browser():
                     break
                 time.sleep(0.15)
                 continue
-        logger.debug("successfully removed temp profile %s" % _.config.user_data_dir)
 
 
 def filter_recurse_all(
-    doc: T, predicate: Callable[[cdp.dom.Node, Element], bool]
+        doc: T, predicate: Callable[[cdp.dom.Node, Element], bool]
 ) -> List[T]:
     """
     test each child using predicate(child), and return all children for which predicate(child) == True
@@ -230,9 +232,19 @@ def filter_recurse(doc: T, predicate: Callable[[cdp.dom.Node, Element], bool]) -
 
 
 def flatten_frame_tree(
-    tree: Union[cdp.page.FrameResourceTree, cdp.page.FrameTree]
+        tree: Union[cdp.page.FrameResourceTree, cdp.page.FrameTree]
 ) -> Generator[cdp.page.Frame, None, None]:
     yield tree.frame
+    if tree.child_frames:
+        for child in tree.child_frames:
+            yield from flatten_frame_tree(child)
+
+
+def flatten_frame_tree_resources(
+        tree: cdp.page.FrameResourceTree,
+) -> Generator[Tuple[cdp.page.Frame, cdp.page.FrameResource], None, None]:
+    for res in tree.resources:
+        yield tree.frame, res
     if tree.child_frames:
         for child in tree.child_frames:
             yield from flatten_frame_tree(child)
@@ -251,7 +263,7 @@ def get_all_param_names(cls):
 
 
 def circle(
-    x, y=None, radius=10, num=10, dir=0
+        x, y=None, radius=10, num=10, dir=0
 ) -> Generator[Tuple[float, float], None, None]:
     """
     a generator will calculate coordinates around a circle.
@@ -319,7 +331,7 @@ async def html_from_tree(tree: Union[cdp.dom.Node, Element], target: "nodriver.T
 
 
 def compare_target_info(
-    info1: cdp.target.TargetInfo, info2: cdp.target.TargetInfo
+        info1: cdp.target.TargetInfo, info2: cdp.target.TargetInfo
 ) -> List[Tuple[str, Any, Any]]:
     """
     when logging mode is set to debug, browser object will log when target info
@@ -380,7 +392,8 @@ def cdp_get_module(domain: Union[str, types.ModuleType]):
 
 def get_cf_template() -> bytearray:
     """
-    this returns a template image (in this case a verify box) used by some anti-bot solutions
+    this returns a template image (of a checkbox)
+    like this: https://ultrafunkamsterdam.github.io/nodriver/_images/template_example.png
     didn't bother the hassle to include image files in my package.
     :return:
     :rtype:
@@ -4549,3 +4562,175 @@ def get_cf_template() -> bytearray:
             130,
         ]
     )
+
+
+from urllib.parse import urlparse
+
+
+class ProxyForwarder:
+    server: asyncio.Server = None
+    host: str = None
+    port: int = None
+    scheme: str = None
+    fw_host: str = None
+    fw_port: int = None
+    fw_scheme: str = None
+
+    @property
+    def proxy_server(self):
+        return self._proxy_server
+
+    def __init__(self, proxy_server):
+        self._proxy_server = None
+
+        url = urlparse(proxy_server)
+        if not url.scheme:
+            # check if ip:port is passed, in which case no forwarder is needed
+            if url.path.find(":") != -1:
+                self._proxy_server = url.path
+        else:
+            if not url.username and not url.password:
+                # if no username and password are provided in the proxy url,
+                # we are not needed either
+                self.scheme = url.scheme
+                self._proxy_server = url.geturl()
+            else:
+                self.port = free_port()
+                self.host = "127.0.0.1"
+                self.scheme = url.scheme
+                self.fw_port = url.port
+                self.fw_host = url.hostname
+                self.fw_scheme = url.scheme
+                self.username = url.username
+                self.password = url.password
+                # report back ourselves as the proxy server
+                self._proxy_server = f"{self.scheme}://{self.host}:{self.port}"
+
+                logger.info(
+                    "socks proxy with authentication is requested : %s" % proxy_server
+                )
+                logger.info("starting forward proxy on %s:%d" % (self.host, self.port))
+                logger.info("which forwards to %s" % proxy_server)
+                asyncio.ensure_future(self.listen())
+
+    async def listen(self):
+        self.server = await asyncio.start_server(
+            self.handle_request, host=self.host, port=self.port
+        )
+        await self.server.start_serving()
+
+    async def handle_request(
+            self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ):
+        if self.scheme.startswith("socks"):
+            return await self.handle_socks_request(reader, writer)
+
+    async def handle_socks_request(
+            self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ):
+        import socket
+        from struct import calcsize, pack, unpack
+
+        NO_ADDR = "0.0.0.0"
+        ATYP_IPv4 = 0x01
+        ATYP_DNS = 0x03
+        ATYP_IPv6 = 0x04
+
+        # import aiosocks2
+        async def read(fmt):
+            """
+            Read from the byte stream
+            :param str fmt: struct format specifier
+            :return tuple:
+            """
+            data = await reader.read(calcsize(fmt))
+            return unpack(fmt, data)
+
+        version, num_methods = await read(">BB")
+        methods = await read("!" + "B" * num_methods)
+
+        # signal to the client there is no username, password required
+        # meanwhile, we do need auth to the upstream server
+        writer.write(pack("!BB", version, 0))
+
+        # read command from the client
+        version, cmd, resv, atyp = await read(">BBBB")
+
+        if atyp == ATYP_IPv4:
+            ip_packed = await reader.read(4)
+            port = (await read("!H"))[0]
+            ip_addr = socket.inet_ntop(socket.AF_INET, ip_packed)
+            hostname = None
+        elif atyp == ATYP_IPv6:
+            ip_packed = await reader.read(16)
+            port = (await read("!H"))[0]
+            ip_addr = socket.inet_ntop(socket.AF_INET6, ip_packed)
+            hostname = None
+        elif atyp == ATYP_DNS:
+            hostname_len = (await read("!B"))[0]
+            hostname = (await read("!{}s".format(hostname_len)))[0]
+            port = (await read("!H"))[0]
+            ip_addr = None
+
+        if hostname:  # noqa
+            if not ip_addr:  # noqa
+                ip_addr = socket.gethostbyname(hostname)  # noqa
+        else:
+            hostname = socket.gethostbyaddr(ip_addr)  # noqa
+
+        # connect to the upstream proxy
+        remote_reader, remote_writer = await asyncio.open_connection(
+            host=self.fw_host, port=self.fw_port
+        )
+
+        # handshake with upstream proxy
+        remote_writer.write(pack(">BBB", version, 1, 2))
+        server_version, server_auth_method = await remote_reader.read(calcsize(">BB"))
+
+        #  authenticate to upstream proxy
+        if server_auth_method == 2:
+            auth_ticket = pack(
+                f">BB{len(self.username)}sB{len(self.password)}s",
+                1,
+                len(self.username),
+                self.username.encode(),
+                len(self.password),
+                self.password.encode(),
+            )
+
+            remote_writer.write(auth_ticket)
+            await remote_writer.drain()
+            ver, result = await remote_reader.read(calcsize("!BB"))
+
+            if result != 0:
+                raise Exception("socks authentication error: %s" % result)
+
+        # forward client socks5 message to upstream proxy
+        remote_writer.write(pack(">BBBB", version, cmd, resv, atyp))
+        remote_writer.write(pack(">B", hostname_len))
+        remote_writer.write(pack(f"!{hostname_len}s", hostname))
+        remote_writer.write(pack("!H", port))
+
+        # create a tunnel between client and upstream proxy
+        event = asyncio.Event()
+        tasks = self.pipe(remote_reader, writer, event), self.pipe(
+            reader, remote_writer, event
+        )
+        await asyncio.gather(*tasks)
+
+    @staticmethod
+    async def pipe(
+            reader: asyncio.StreamReader, writer: asyncio.StreamWriter, event: asyncio.Event
+    ):
+        logger.debug("client proxy to authenticated proxy pipe")
+        while not event.is_set():
+            try:
+                data = await asyncio.wait_for(reader.read(2 ** 16), 1)
+                if not data:
+                    break
+                # simply forward
+
+                writer.write(data)
+            except asyncio.TimeoutError:
+                continue
+        event.set()

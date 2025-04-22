@@ -31,6 +31,22 @@ class CentralState(enum.Enum):
         return cls(json)
 
 
+class GATTOperationType(enum.Enum):
+    """
+    Indicates the various types of GATT event.
+    """
+
+    CONNECTION = "connection"
+    DISCOVERY = "discovery"
+
+    def to_json(self) -> str:
+        return self.value
+
+    @classmethod
+    def from_json(cls, json: str) -> GATTOperationType:
+        return cls(json)
+
+
 @dataclass
 class ManufacturerData:
     """
@@ -146,16 +162,37 @@ class ScanEntry:
         )
 
 
-def enable(state: CentralState) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
+def enable(
+        state: CentralState, le_supported: bool
+) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Enable the BluetoothEmulation domain.
+
+    :param state: State of the simulated central.
+    :param le_supported: If the simulated central supports low-energy.
+    """
+    params: T_JSON_DICT = dict()
+    params["state"] = state.to_json()
+    params["leSupported"] = le_supported
+    cmd_dict: T_JSON_DICT = {
+        "method": "BluetoothEmulation.enable",
+        "params": params,
+    }
+    json = yield cmd_dict
+
+
+def set_simulated_central_state(
+        state: CentralState,
+) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
+    """
+    Set the state of the simulated central.
 
     :param state: State of the simulated central.
     """
     params: T_JSON_DICT = dict()
     params["state"] = state.to_json()
     cmd_dict: T_JSON_DICT = {
-        "method": "BluetoothEmulation.enable",
+        "method": "BluetoothEmulation.setSimulatedCentralState",
         "params": params,
     }
     json = yield cmd_dict
@@ -172,10 +209,10 @@ def disable() -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
 
 
 def simulate_preconnected_peripheral(
-    address: str,
-    name: str,
-    manufacturer_data: typing.List[ManufacturerData],
-    known_service_uuids: typing.List[str],
+        address: str,
+        name: str,
+        manufacturer_data: typing.List[ManufacturerData],
+        known_service_uuids: typing.List[str],
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Simulates a peripheral with ``address``, ``name`` and ``knownServiceUuids``
@@ -199,7 +236,7 @@ def simulate_preconnected_peripheral(
 
 
 def simulate_advertisement(
-    entry: ScanEntry,
+        entry: ScanEntry,
 ) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
     """
     Simulates an advertisement packet described in ``entry`` being received by
@@ -214,3 +251,45 @@ def simulate_advertisement(
         "params": params,
     }
     json = yield cmd_dict
+
+
+def simulate_gatt_operation_response(
+        address: str, type_: GATTOperationType, code: int
+) -> typing.Generator[T_JSON_DICT, T_JSON_DICT, None]:
+    """
+    Simulates the response code from the peripheral with ``address`` for a
+    GATT operation of ``type``. The ``code`` value follows the HCI Error Codes from
+    Bluetooth Core Specification Vol 2 Part D 1.3 List Of Error Codes.
+
+    :param address:
+    :param type_:
+    :param code:
+    """
+    params: T_JSON_DICT = dict()
+    params["address"] = address
+    params["type"] = type_.to_json()
+    params["code"] = code
+    cmd_dict: T_JSON_DICT = {
+        "method": "BluetoothEmulation.simulateGATTOperationResponse",
+        "params": params,
+    }
+    json = yield cmd_dict
+
+
+@event_class("BluetoothEmulation.gattOperationReceived")
+@dataclass
+class GattOperationReceived:
+    """
+    Event for when a GATT operation of ``type`` to the peripheral with ``address``
+    happened.
+    """
+
+    address: str
+    type_: GATTOperationType
+
+    @classmethod
+    def from_json(cls, json: T_JSON_DICT) -> GattOperationReceived:
+        return cls(
+            address=str(json["address"]),
+            type_=GATTOperationType.from_json(json["type"]),
+        )
